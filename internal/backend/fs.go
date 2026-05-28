@@ -197,13 +197,11 @@ func (s *storageFS) DeleteBucket(name string) error {
 // reading the object content. Any checksum or hash in the passed-in object
 // metadata is overwritten.
 func (s *storageFS) CreateObject(obj StreamingObject, conditions Conditions) (StreamingObject, error) {
-	if obj.Generation > 0 {
-		return StreamingObject{}, errors.New("not implemented: fs storage type does not support objects generation yet")
-	}
-
-	// Note: this was a quick fix for issue #701. Now that we have a way to
-	// persist object attributes, we should implement versioning in the
-	// filesystem backend and handle generations outside of the backends.
+	// The filesystem backend does not support object versioning.
+	// When a client sends a non-zero generation (e.g. the
+	// @google-cloud/storage SDK during a simple upload), ignore it
+	// and assign a fresh timestamp-based generation instead of
+	// rejecting the request outright.
 	obj.Generation = time.Now().UnixNano() / 1000
 
 	s.mtx.Lock()

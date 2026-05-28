@@ -260,6 +260,12 @@ func (s *Server) buildMuxer() {
 	routers := []*mux.Router{
 		handler.PathPrefix(apiPrefix).Subrouter(),
 		handler.MatcherFunc(s.publicHostMatcher).PathPrefix(apiPrefix).Subrouter(),
+		// When @google-cloud/storage is configured with a bare emulator
+		// endpoint (no /storage/v1 suffix), metadata calls (exists,
+		// getMetadata, getObject, etc.) arrive without the /storage/v1
+		// prefix — e.g. GET /b/{bucket}/o/{object}. Register the same
+		// handlers on the root so both prefixed and unprefixed paths work.
+		handler.PathPrefix("").Subrouter(),
 	}
 
 	for _, r := range routers {
@@ -310,6 +316,10 @@ func (s *Server) buildMuxer() {
 	bucketHost := fmt.Sprintf("{bucketName}.%s", s.publicHost)
 	handler.Host(bucketHost).Path("/{objectName:.+}").Methods(http.MethodGet, http.MethodHead).HandlerFunc(s.downloadObject)
 	handler.Path("/download/storage/v1/b/{bucketName}/o/{objectName:.+}").Methods(http.MethodGet, http.MethodHead).HandlerFunc(s.downloadObject)
+	// Firebase Storage REST API compat: the Firebase emulator and
+	// storage.service.ts getPublicUrl() emit /v0/b/{bucket}/o/{object}?alt=media
+	// URLs. Route them to the same download handler.
+	handler.Path("/v0/b/{bucketName}/o/{objectName:.+}").Queries("alt", "media").Methods(http.MethodGet, http.MethodHead).HandlerFunc(s.downloadObject)
 	handler.Path("/upload/storage/v1/b/{bucketName}/o").Methods(http.MethodPost).HandlerFunc(jsonToHTTPHandler(s.insertObject))
 	handler.Path("/upload/storage/v1/b/{bucketName}/o/").Methods(http.MethodPost).HandlerFunc(jsonToHTTPHandler(s.insertObject))
 	handler.Path("/upload/storage/v1/b/{bucketName}/o").Methods(http.MethodPut).HandlerFunc(jsonToHTTPHandler(s.uploadFileContent))

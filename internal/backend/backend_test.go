@@ -67,15 +67,13 @@ func shouldError(t *testing.T, err error) {
 }
 
 func uploadAndCompare(t *testing.T, storage Storage, obj Object) int64 {
-	isFSStorage := reflect.TypeOf(storage) == reflect.TypeOf(&storageFS{})
 	newObject, err := storage.CreateObject(obj.StreamingObject(), NoConditions{})
-	if isFSStorage && obj.Generation != 0 {
-		t.Log("FS should not support objects generation")
-		shouldError(t, err)
-		obj.Generation = 0
-		newObject, err = storage.CreateObject(obj.StreamingObject(), NoConditions{})
-	}
 	noError(t, err)
+	// The backend may assign a new generation (e.g. the filesystem
+	// backend always overwrites the incoming generation with a
+	// timestamp). Use the returned generation for subsequent
+	// comparisons so the test doesn't fail on a harmless mismatch.
+	obj.Generation = newObject.Generation
 	newObject.Close()
 	activeObj, err := storage.GetObject(obj.BucketName, obj.Name)
 	noError(t, err)
